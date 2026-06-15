@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+target: 'https://prestamos-production-2931.up.railway.app',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
