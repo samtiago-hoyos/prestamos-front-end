@@ -1,4 +1,4 @@
-// App.jsx — Layout principal + navegación
+'use strict'
 import { useState, useCallback } from 'react'
 import FormularioPage from './pages/FormularioPage'
 import ListaPage from './pages/ListaPage'
@@ -40,6 +40,11 @@ export default function App() {
     if (type !== 'error') setPagina('lista')
   }, [mostrarToast])
 
+  const navegar = (key) => {
+    setPagina(key)
+    setSide(false)
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F0F2F5', fontFamily: 'Inter, system-ui, sans-serif' }}>
 
@@ -47,33 +52,55 @@ export default function App() {
       {sideOpen && (
         <div
           onClick={() => setSide(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'none' }}
-          className="mobile-overlay"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            zIndex: 200, display: 'block',
+          }}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — oculto en móvil por defecto */}
       <aside style={{
-        width: 240, background: '#1B2B4B', flexShrink: 0,
-        display: 'flex', flexDirection: 'column',
-        position: 'sticky', top: 0, height: '100vh',
+        width: 240,
+        background: '#1B2B4B',
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'fixed',
+        top: 0,
+        left: sideOpen ? 0 : '-240px',
+        height: '100vh',
+        zIndex: 300,
+        transition: 'left 0.25s ease',
       }}>
         {/* Logo */}
         <div style={{ padding: '24px 20px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: '#3D7FFF', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14H11v-2h2v2zm0-4H11V7h2v5z" fill="#fff"/>
-              </svg>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: '#3D7FFF', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14H11v-2h2v2zm0-4H11V7h2v5z" fill="#fff"/>
+                </svg>
+              </div>
+              <div>
+                <p style={{ color: '#fff', fontWeight: 700, fontSize: 15, margin: 0 }}>PréstamoApp</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>Panel de gestión</p>
+              </div>
             </div>
-            <div>
-              <p style={{ color: '#fff', fontWeight: 700, fontSize: 15, margin: 0, letterSpacing: '-0.01em' }}>PréstamoApp</p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>Panel de gestión</p>
-            </div>
+            {/* Botón cerrar en móvil */}
+            <button
+              onClick={() => setSide(false)}
+              style={{
+                background: 'rgba(255,255,255,0.1)', border: 'none',
+                borderRadius: 8, width: 32, height: 32, cursor: 'pointer',
+                color: '#fff', fontSize: 18, display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >×</button>
           </div>
         </div>
 
@@ -91,20 +118,18 @@ export default function App() {
             return (
               <button
                 key={item.key}
-                onClick={() => setPagina(item.key)}
+                onClick={() => navegar(item.key)}
                 style={{
-                  width: '100%', padding: '10px 12px',
+                  width: '100%', padding: '12px 12px',
                   display: 'flex', alignItems: 'center', gap: 10,
                   border: 'none', borderRadius: 8, cursor: 'pointer',
                   background: active ? 'rgba(61,127,255,0.2)' : 'transparent',
                   color: active ? '#93C5FD' : 'rgba(255,255,255,0.55)',
                   fontWeight: active ? 600 : 400,
-                  fontSize: 14, textAlign: 'left',
-                  marginBottom: 2, transition: 'all .15s',
+                  fontSize: 15, textAlign: 'left',
+                  marginBottom: 4, transition: 'all .15s',
                   borderLeft: active ? '3px solid #3D7FFF' : '3px solid transparent',
                 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
               >
                 {item.icon}
                 {item.label}
@@ -113,47 +138,61 @@ export default function App() {
           })}
         </nav>
 
-        {/* Footer sidebar */}
         <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, margin: 0 }}>
-            API: localhost:3000
+            API: Railway
           </p>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main style={{ flex: 1, overflow: 'auto' }}>
+      {/* Main content — ocupa todo el ancho en móvil */}
+      <main style={{ flex: 1, overflow: 'auto', width: '100%' }}>
         {/* Top bar */}
         <div style={{
           background: '#fff', borderBottom: '1px solid #E5E7EB',
-          padding: '16px 32px', display: 'flex', alignItems: 'center',
+          padding: '14px 16px', display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50,
         }}>
-          <div>
-            <p style={{ margin: 0, fontSize: 13, color: '#9CA3AF' }}>
-              {pagina === 'lista' ? 'Listado de préstamos' : 'Formulario de registro'}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Botón hamburguesa */}
+            <button
+              onClick={() => setSide(true)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: 6, borderRadius: 8, color: '#1B2B4B',
+                display: 'flex', alignItems: 'center',
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, color: '#9CA3AF' }}>
+                {pagina === 'lista' ? 'Listado de préstamos' : 'Formulario de registro'}
+              </p>
+            </div>
           </div>
           {pagina === 'lista' && (
             <button
-              onClick={() => setPagina('nuevo')}
+              onClick={() => navegar('nuevo')}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '8px 16px', background: '#3D7FFF', color: '#fff',
+                padding: '8px 14px', background: '#3D7FFF', color: '#fff',
                 border: 'none', borderRadius: 8, fontWeight: 600,
-                fontSize: 13, cursor: 'pointer',
+                fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
               </svg>
-              Nuevo préstamo
+              Nuevo
             </button>
           )}
         </div>
 
         {/* Page content */}
-        <div style={{ padding: '32px', maxWidth: 900, margin: '0 auto' }}>
+        <div style={{ padding: '20px 16px', maxWidth: 900, margin: '0 auto' }}>
           {pagina === 'lista' ? (
             <ListaPage onToast={mostrarToast} />
           ) : (
@@ -175,9 +214,6 @@ export default function App() {
         * { box-sizing: border-box; }
         body { margin: 0; }
         input:focus { border-color: #3D7FFF !important; box-shadow: 0 0 0 3px rgba(61,127,255,0.15); }
-        @media (max-width: 640px) {
-          aside { display: none; }
-        }
       `}</style>
     </div>
   )
