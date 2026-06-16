@@ -13,6 +13,15 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
   const interesTotal = parseFloat(prestamo.total_devolver) - parseFloat(prestamo.monto)
   const porcentajeInteres = ((interesTotal / parseFloat(prestamo.monto)) * 100).toFixed(1)
 
+  // ── Lógica de vencimiento ──────────────────────────────────
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const fechaVenc = prestamo.fecha_vencimiento ? new Date(prestamo.fecha_vencimiento) : null
+  const estaVencido = fechaVenc && fechaVenc < hoy && prestamo.estado === 'pendiente'
+  const diasVencido = fechaVenc ? Math.floor((hoy - fechaVenc) / (1000 * 60 * 60 * 24)) : 0
+  const diasRestantes = fechaVenc ? Math.floor((fechaVenc - hoy) / (1000 * 60 * 60 * 24)) : null
+  const venceProximo = diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 7 && prestamo.estado === 'pendiente'
+
   const guardarEstado = async () => {
     if (estado === prestamo.estado) return
     setSaving(true)
@@ -46,8 +55,62 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
           boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
           overflow: 'hidden',
           animation: 'fadeIn .2s ease',
+          maxHeight: '90vh',
+          overflowY: 'auto',
         }}
       >
+        {/* ── Advertencia vencido ── */}
+        {estaVencido && (
+          <div style={{
+            background: '#FEE2E2', borderBottom: '1px solid #FECACA',
+            padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%', background: '#EF4444',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M12 9v4M12 17h.01" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <p style={{ margin: 0, fontWeight: 700, color: '#DC2626', fontSize: 14 }}>
+                ⚠️ Préstamo vencido hace {diasVencido} día{diasVencido !== 1 ? 's' : ''}
+              </p>
+              <p style={{ margin: 0, color: '#EF4444', fontSize: 12, marginTop: 2 }}>
+                Venció el {formatFecha(prestamo.fecha_vencimiento)} y aún está pendiente de pago.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Advertencia próximo a vencer ── */}
+        {venceProximo && (
+          <div style={{
+            background: '#FEF3C7', borderBottom: '1px solid #FDE68A',
+            padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%', background: '#F59E0B',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="2"/>
+                <path d="M12 8v4l3 3" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <p style={{ margin: 0, fontWeight: 700, color: '#B45309', fontSize: 14 }}>
+                🕐 Vence en {diasRestantes} día{diasRestantes !== 1 ? 's' : ''}
+              </p>
+              <p style={{ margin: 0, color: '#D97706', fontSize: 12, marginTop: 2 }}>
+                Fecha límite: {formatFecha(prestamo.fecha_vencimiento)}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #1B2B4B 0%, #2B4080 100%)',
@@ -66,20 +129,15 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
           <h2 style={{ color: '#fff', margin: '0 0 16px', fontSize: 20, fontWeight: 700 }}>
             {prestamo.prestatario}
           </h2>
-          {/* Stat cards */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <StatCard label="Monto prestado" value={formatCOP(prestamo.monto)} />
-            <StatCard
-              label="Total a devolver"
-              value={formatCOP(prestamo.total_devolver)}
-              accent="#93C5FD"
-            />
+            <StatCard label="Total a devolver" value={formatCOP(prestamo.total_devolver)} accent="#93C5FD" />
           </div>
         </div>
 
         {/* Body */}
         <div style={{ padding: '24px 28px' }}>
-          {/* Barra de interés — elemento firma */}
+          {/* Barra de interés */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>Costo del crédito</span>
@@ -103,19 +161,23 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
             </div>
           </div>
 
-          {/* Datos adicionales */}
+          {/* Fechas */}
           <div style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr',
             gap: 10, marginBottom: 24,
           }}>
+            <InfoRow label="Fecha préstamo" value={prestamo.fecha_prestamo ? formatFecha(prestamo.fecha_prestamo) : '—'} />
+            <InfoRow
+              label="Fecha vencimiento"
+              value={prestamo.fecha_vencimiento ? formatFecha(prestamo.fecha_vencimiento) : '—'}
+              color={estaVencido ? '#DC2626' : venceProximo ? '#D97706' : undefined}
+            />
             <InfoRow label="Registrado" value={formatFecha(prestamo.created_at)} />
             <InfoRow label="Actualizado" value={formatFecha(prestamo.updated_at)} />
           </div>
 
           {/* Cambio de estado */}
-          <div style={{
-            background: '#F9FAFB', borderRadius: 12, padding: '16px 18px',
-          }}>
+          <div style={{ background: '#F9FAFB', borderRadius: 12, padding: '16px 18px' }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
               Estado del préstamo
             </p>
@@ -166,9 +228,7 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
 
 function StatCard({ label, value, accent = 'rgba(255,255,255,0.85)' }) {
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px',
-    }}>
+    <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px' }}>
       <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </p>
@@ -179,11 +239,11 @@ function StatCard({ label, value, accent = 'rgba(255,255,255,0.85)' }) {
   )
 }
 
-function InfoRow({ label, value }) {
+function InfoRow({ label, value, color }) {
   return (
     <div>
       <p style={{ fontSize: 11, color: '#9CA3AF', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
-      <p style={{ fontSize: 14, color: '#374151', fontWeight: 500, margin: 0 }}>{value}</p>
+      <p style={{ fontSize: 14, color: color || '#374151', fontWeight: color ? 700 : 500, margin: 0 }}>{value}</p>
     </div>
   )
 }
