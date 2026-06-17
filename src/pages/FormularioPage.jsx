@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { api } from '../services/api'
 import { calcularTotal, formatCOP } from '../utils/format'
 
-const INIT = { prestatario: '', monto: '', tasa_interes: '', meses: '' }
+const hoy = new Date().toISOString().split('T')[0]
+const INIT = { prestatario: '', monto: '', tasa_interes: '', meses: '', fecha_prestamo: hoy }
+
 const FIELD_STYLE = {
   width: '100%', padding: '10px 14px', border: '1.5px solid #E5E7EB',
   borderRadius: 8, fontSize: 15, outline: 'none', color: '#111827',
@@ -22,6 +24,15 @@ export default function FormularioPage({ onSuccess }) {
   const total = (monto > 0 && tasa >= 0 && meses > 0) ? calcularTotal(monto, tasa, meses) : null
   const interes = total ? total - monto : 0
 
+  // Calcular fecha de vencimiento para mostrar preview
+  const fechaVencimiento = form.fecha_prestamo && meses > 0
+    ? (() => {
+        const f = new Date(form.fecha_prestamo)
+        f.setMonth(f.getMonth() + meses)
+        return f.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      })()
+    : null
+
   const cambiar = (e) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
     setErrors(er => ({ ...er, [e.target.name]: '' }))
@@ -33,6 +44,7 @@ export default function FormularioPage({ onSuccess }) {
     if (!form.monto || Number(form.monto) <= 0) e.monto = 'Ingresa un monto válido.'
     if (form.tasa_interes === '' || Number(form.tasa_interes) < 0) e.tasa_interes = 'Ingresa una tasa >= 0.'
     if (!form.meses || !Number.isInteger(Number(form.meses)) || Number(form.meses) <= 0) e.meses = 'Ingresa un número de meses válido.'
+    if (!form.fecha_prestamo) e.fecha_prestamo = 'La fecha de inicio es obligatoria.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -43,10 +55,11 @@ export default function FormularioPage({ onSuccess }) {
     setLoading(true)
     try {
       await api.crear({
-        prestatario:  form.prestatario.trim(),
-        monto:        Number(form.monto),
-        tasa_interes: Number(form.tasa_interes),
-        meses:        Number(form.meses),
+        prestatario:   form.prestatario.trim(),
+        monto:         Number(form.monto),
+        tasa_interes:  Number(form.tasa_interes),
+        meses:         Number(form.meses),
+        fecha_prestamo: form.fecha_prestamo,
       })
       setForm(INIT)
       onSuccess('Préstamo registrado correctamente.')
@@ -73,32 +86,36 @@ export default function FormularioPage({ onSuccess }) {
         <div style={{
           background: 'linear-gradient(135deg, #1B2B4B 0%, #2B4080 100%)',
           borderRadius: 16, padding: '20px 24px', marginBottom: 24,
-          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexWrap: 'wrap', gap: 12,
+          color: '#fff',
         }}>
-          <div>
-            <p style={{ fontSize: 12, opacity: 0.65, margin: 0, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Total a devolver
-            </p>
-            <p style={{ fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-              {formatCOP(total)}
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+            <div>
+              <p style={{ fontSize: 12, opacity: 0.65, margin: 0, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Total a devolver
+              </p>
+              <p style={{ fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                {formatCOP(total)}
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: 12, opacity: 0.65, margin: 0, marginBottom: 4 }}>Interés generado</p>
+              <p style={{ fontSize: 18, fontWeight: 600, margin: 0, color: '#93C5FD', fontVariantNumeric: 'tabular-nums' }}>
+                + {formatCOP(interes)}
+              </p>
+            </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 12, opacity: 0.65, margin: 0, marginBottom: 4 }}>Interés generado</p>
-            <p style={{ fontSize: 18, fontWeight: 600, margin: 0, color: '#93C5FD', fontVariantNumeric: 'tabular-nums' }}>
-              + {formatCOP(interes)}
-            </p>
-          </div>
-          {/* Desglose */}
-          <div style={{ width: '100%', borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 12, display: 'flex', gap: 20 }}>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 12, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, opacity: 0.6 }}>
               Capital: <strong style={{ opacity: 1 }}>{formatCOP(monto)}</strong>
             </span>
             <span style={{ fontSize: 12, opacity: 0.6 }}>
-              Tasa: <strong style={{ opacity: 1 }}>{(tasa * 100).toFixed(2)}% × {meses} mes{meses !== 1 ? 'es' : ''}
-            </strong>
+              Tasa: <strong style={{ opacity: 1 }}>{(tasa * 100).toFixed(2)}% × {meses} mes{meses !== 1 ? 'es' : ''}</strong>
             </span>
+            {fechaVencimiento && (
+              <span style={{ fontSize: 12, opacity: 0.6 }}>
+                Vence: <strong style={{ opacity: 1, color: '#FCD34D' }}>{fechaVencimiento}</strong>
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -126,7 +143,7 @@ export default function FormularioPage({ onSuccess }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {/* Tasa */}
-            <Field label="Tasa de interés mensual" hint="Ej: 0.05 = 5%" error={errors.tasa_interes}>
+            <Field label="Tasa mensual" hint="Ej: 0.05 = 5%" error={errors.tasa_interes}>
               <input
                 style={FIELD_STYLE} name="tasa_interes" type="number"
                 placeholder="0.05" step="0.001" min="0"
@@ -143,6 +160,14 @@ export default function FormularioPage({ onSuccess }) {
             </Field>
           </div>
 
+          {/* Fecha de inicio */}
+          <Field label="Fecha de inicio del préstamo" error={errors.fecha_prestamo}>
+            <input
+              style={FIELD_STYLE} name="fecha_prestamo" type="date"
+              value={form.fecha_prestamo} onChange={cambiar}
+            />
+          </Field>
+
           <button
             type="submit" disabled={loading}
             style={{
@@ -154,11 +179,9 @@ export default function FormularioPage({ onSuccess }) {
               justifyContent: 'center', gap: 8,
             }}
           >
-            {loading ? (
-              <>
-                <Spinner /> Guardando…
-              </>
-            ) : 'Registrar préstamo'}
+            {loading ? <>
+              <Spinner /> Guardando…
+            </> : 'Registrar préstamo'}
           </button>
         </div>
       </form>
