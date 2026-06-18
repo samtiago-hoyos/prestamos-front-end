@@ -31,4 +31,5 @@ export const api = {
     body: JSON.stringify({ monto_cuota, nota }),
   }).then(handleResponse),
   listarPagos: (id) => fetch(`${BASE}/${id}/pagos`).then(handleResponse),
+  
 }

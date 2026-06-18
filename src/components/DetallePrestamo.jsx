@@ -15,18 +15,27 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
   const [tab, setTab]                   = useState('detalle')
 
   const tasaInicial = parseFloat(prestamo.tasa_interes) * 100
-  const [editTasa, setEditTasa]     = useState(tasaInicial.toFixed(2))
-  const [editMeses, setEditMeses]   = useState(String(prestamo.meses))
-  const [editFecha, setEditFecha]   = useState(
+  const [editTasa, setEditTasa]       = useState(tasaInicial.toFixed(2))
+  const [editMeses, setEditMeses]     = useState(String(prestamo.meses))
+  const [editCuotas, setEditCuotas]   = useState(String(prestamo.cuotas_por_mes ?? 1))
+  const [editFecha, setEditFecha]     = useState(
     prestamo.fecha_prestamo ? String(prestamo.fecha_prestamo).slice(0, 10) : ''
   )
-  const [editTotal, setEditTotal]   = useState(String(prestamo.total_devolver))
-  const [savingEdit, setSavingEdit] = useState(false)
-  const [editErrors, setEditErrors] = useState({})
+  const [editTotal, setEditTotal]     = useState(String(prestamo.total_devolver))
+  const [savingEdit, setSavingEdit]   = useState(false)
+  const [editErrors, setEditErrors]   = useState({})
 
   const saldo = parseFloat(prestamo.saldo_restante ?? prestamo.monto)
   const monto = parseFloat(prestamo.monto)
   const porcentajePagado = Math.min(((monto - saldo) / monto) * 100, 100).toFixed(1)
+
+  // Cálculo de cuota sugerida
+  const cuotasPorMes  = Math.max(1, parseInt(editCuotas) || 1)
+  const mesesEdit     = parseInt(editMeses) || 0
+  const totalCuotas   = mesesEdit * cuotasPorMes
+  const montoCuota    = parseFloat(editTotal) > 0 && totalCuotas > 0
+    ? parseFloat(editTotal) / totalCuotas
+    : null
 
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
   const fechaVenc     = prestamo.fecha_vencimiento ? new Date(prestamo.fecha_vencimiento) : null
@@ -72,13 +81,15 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
 
   const validarEdicion = () => {
     const errs = {}
-    const tasa  = parseFloat(editTasa)
-    const meses = parseInt(editMeses, 10)
-    const total = parseFloat(editTotal)
-    if (isNaN(tasa) || tasa < 0)    errs.tasa  = 'Debe ser ≥ 0'
-    if (isNaN(meses) || meses <= 0) errs.meses = 'Debe ser mayor a 0'
-    if (!editFecha)                  errs.fecha = 'Fecha requerida'
-    if (isNaN(total) || total <= 0)  errs.total = 'Debe ser mayor a 0'
+    const tasa   = parseFloat(editTasa)
+    const meses  = parseInt(editMeses, 10)
+    const cuotas = parseInt(editCuotas, 10)
+    const total  = parseFloat(editTotal)
+    if (isNaN(tasa) || tasa < 0)      errs.tasa   = 'Debe ser ≥ 0'
+    if (isNaN(meses) || meses <= 0)   errs.meses  = 'Debe ser mayor a 0'
+    if (isNaN(cuotas) || cuotas <= 0) errs.cuotas = 'Debe ser mayor a 0'
+    if (!editFecha)                    errs.fecha  = 'Fecha requerida'
+    if (isNaN(total) || total <= 0)    errs.total  = 'Debe ser mayor a 0'
     return errs
   }
 
@@ -91,6 +102,7 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
       await api.actualizar(prestamo.id, {
         tasa_interes:   parseFloat(editTasa) / 100,
         meses:          parseInt(editMeses, 10),
+        cuotas_por_mes: parseInt(editCuotas, 10),
         fecha_prestamo: editFecha,
         total_devolver: parseFloat(editTotal),
       })
@@ -201,9 +213,26 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
                 <InfoRow label="Tasa de interés" value={`${(parseFloat(prestamo.tasa_interes) * 100).toFixed(2)}% mensual`} />
                 <InfoRow label="Plazo" value={`${prestamo.meses} meses`} />
+                <InfoRow label="Cuotas por mes" value={prestamo.cuotas_por_mes ?? 1} />
+                <InfoRow label="Total cuotas" value={(prestamo.meses ?? 0) * (prestamo.cuotas_por_mes ?? 1)} />
                 <InfoRow label="Fecha préstamo" value={prestamo.fecha_prestamo ? formatFecha(prestamo.fecha_prestamo) : '—'} />
                 <InfoRow label="Fecha vencimiento" value={prestamo.fecha_vencimiento ? formatFecha(prestamo.fecha_vencimiento) : '—'} color={estaVencido ? '#DC2626' : venceProximo ? '#D97706' : undefined} />
               </div>
+
+              {/* Cuota sugerida */}
+              {prestamo.total_devolver && prestamo.meses && (
+                <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 11, color: '#15803D', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor por cuota</p>
+                    <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#15803D' }}>
+                      {formatCOP(prestamo.total_devolver / ((prestamo.meses ?? 1) * (prestamo.cuotas_por_mes ?? 1)))}
+                    </p>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: '#16A34A', textAlign: 'right' }}>
+                    {(prestamo.meses ?? 1) * (prestamo.cuotas_por_mes ?? 1)} cuotas en total
+                  </p>
+                </div>
+              )}
 
               <div style={{ background: '#F9FAFB', borderRadius: 12, padding: '16px' }}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Estado del préstamo</p>
@@ -240,6 +269,7 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 ✏️ Modifica los campos que necesites. El total a devolver se puede recalcular automáticamente.
               </div>
 
+              {/* Tasa */}
               <div>
                 <label style={labelStyle}>Tasa de interés mensual (%)</label>
                 <input
@@ -253,19 +283,61 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 {editErrors.tasa && <p style={errStyle}>{editErrors.tasa}</p>}
               </div>
 
-              <div>
-                <label style={labelStyle}>Plazo (meses)</label>
-                <input
-                  type="number" min="1" step="1"
-                  value={editMeses}
-                  onChange={e => setEditMeses(e.target.value)}
-                  onBlur={recalcularTotal}
-                  style={{ ...inputStyle, borderColor: editErrors.meses ? '#EF4444' : '#E5E7EB' }}
-                  placeholder="ej: 6"
-                />
-                {editErrors.meses && <p style={errStyle}>{editErrors.meses}</p>}
+              {/* Meses + Cuotas por mes en grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Plazo (meses)</label>
+                  <input
+                    type="number" min="1" step="1"
+                    value={editMeses}
+                    onChange={e => setEditMeses(e.target.value)}
+                    onBlur={recalcularTotal}
+                    style={{ ...inputStyle, borderColor: editErrors.meses ? '#EF4444' : '#E5E7EB' }}
+                    placeholder="ej: 6"
+                  />
+                  {editErrors.meses && <p style={errStyle}>{editErrors.meses}</p>}
+                </div>
+                <div>
+                  <label style={labelStyle}>Cuotas por mes</label>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[1, 2, 4].map(n => (
+                      <button
+                        key={n} type="button"
+                        onClick={() => setEditCuotas(String(n))}
+                        style={{
+                          flex: 1, padding: '10px 0', border: '1.5px solid',
+                          borderColor: cuotasPorMes === n ? '#3D7FFF' : '#E5E7EB',
+                          borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                          background: cuotasPorMes === n ? '#EFF6FF' : '#FAFAFA',
+                          color: cuotasPorMes === n ? '#1D4ED8' : '#6B7280',
+                        }}
+                      >
+                        {n === 1 ? 'Mens.' : n === 2 ? 'Quin.' : 'Sem.'}
+                      </button>
+                    ))}
+                    <input
+                      type="number" min="1" max="31"
+                      value={editCuotas}
+                      onChange={e => setEditCuotas(e.target.value)}
+                      style={{ ...inputStyle, width: 48, flex: 'none', textAlign: 'center', fontSize: 13, padding: '10px 4px' }}
+                    />
+                  </div>
+                  {editErrors.cuotas && <p style={errStyle}>{editErrors.cuotas}</p>}
+                </div>
               </div>
 
+              {/* Preview cuota en edición */}
+              {montoCuota && (
+                <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 11, color: '#15803D', textTransform: 'uppercase' }}>Valor por cuota</p>
+                    <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#15803D' }}>{formatCOP(montoCuota)}</p>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: '#16A34A' }}>{totalCuotas} cuotas en total</p>
+                </div>
+              )}
+
+              {/* Fecha */}
               <div>
                 <label style={labelStyle}>Fecha del préstamo</label>
                 <input
@@ -277,6 +349,7 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 {editErrors.fecha && <p style={errStyle}>{editErrors.fecha}</p>}
               </div>
 
+              {/* Total */}
               <div>
                 <label style={labelStyle}>Total a devolver (COP)</label>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -302,8 +375,7 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 width: '100%', padding: '13px 0', border: 'none', borderRadius: 10,
                 background: savingEdit ? '#93C5FD' : '#1B2B4B',
                 color: '#fff', fontWeight: 700, fontSize: 15,
-                cursor: savingEdit ? 'not-allowed' : 'pointer',
-                marginTop: 4,
+                cursor: savingEdit ? 'not-allowed' : 'pointer', marginTop: 4,
               }}>
                 {savingEdit ? 'Guardando…' : '💾 Guardar cambios'}
               </button>
@@ -316,9 +388,16 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
               {prestamo.estado !== 'pagado' && (
                 <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 12, padding: '16px', marginBottom: 20 }}>
                   <p style={{ fontSize: 13, fontWeight: 700, color: '#15803D', marginBottom: 4 }}>💰 Registrar pago</p>
-                  <p style={{ fontSize: 12, color: '#16A34A', marginBottom: 12 }}>
+                  <p style={{ fontSize: 12, color: '#16A34A', marginBottom: 4 }}>
                     Saldo restante: <strong>{formatCOP(saldo)}</strong>
                   </p>
+                  {prestamo.total_devolver && prestamo.meses && (
+                    <p style={{ fontSize: 12, color: '#16A34A', marginBottom: 12 }}>
+                      Cuota sugerida: <strong>
+                        {formatCOP(prestamo.total_devolver / ((prestamo.meses ?? 1) * (prestamo.cuotas_por_mes ?? 1)))}
+                      </strong>
+                    </p>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input
                       type="number" placeholder="Monto que pagó el cliente"

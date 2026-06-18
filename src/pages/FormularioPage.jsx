@@ -4,7 +4,7 @@ import { api } from '../services/api'
 import { calcularTotal, formatCOP } from '../utils/format'
 
 const hoy = new Date().toISOString().split('T')[0]
-const INIT = { prestatario: '', monto: '', tasa_interes: '', meses: '', fecha_prestamo: hoy }
+const INIT = { prestatario: '', monto: '', tasa_interes: '', meses: '', cuotas_por_mes: '1', fecha_prestamo: hoy }
 
 const FIELD_STYLE = {
   width: '100%', padding: '10px 14px', border: '1.5px solid #E5E7EB',
@@ -18,13 +18,15 @@ export default function FormularioPage({ onSuccess }) {
   const [errors, setErrors]   = useState({})
   const [loading, setLoading] = useState(false)
 
-  const monto = parseFloat(form.monto) || 0
-  const tasa  = parseFloat(form.tasa_interes) || 0
-  const meses = parseInt(form.meses) || 0
-  const total = (monto > 0 && tasa >= 0 && meses > 0) ? calcularTotal(monto, tasa, meses) : null
-  const interes = total ? total - monto : 0
+  const monto          = parseFloat(form.monto) || 0
+  const tasa           = parseFloat(form.tasa_interes) || 0
+  const meses          = parseInt(form.meses) || 0
+  const cuotasPorMes   = Math.max(1, parseInt(form.cuotas_por_mes) || 1)
+  const total          = (monto > 0 && tasa >= 0 && meses > 0) ? calcularTotal(monto, tasa, meses) : null
+  const interes        = total ? total - monto : 0
+  const totalCuotas    = meses * cuotasPorMes
+  const montoCuota     = total ? total / totalCuotas : null
 
-  // Calcular fecha de vencimiento para mostrar preview
   const fechaVencimiento = form.fecha_prestamo && meses > 0
     ? (() => {
         const f = new Date(form.fecha_prestamo)
@@ -54,13 +56,14 @@ export default function FormularioPage({ onSuccess }) {
     if (!validar()) return
     setLoading(true)
     try {
-      await api.crear({
-        prestatario:   form.prestatario.trim(),
-        monto:         Number(form.monto),
-        tasa_interes:  Number(form.tasa_interes),
-        meses:         Number(form.meses),
-        fecha_prestamo: form.fecha_prestamo,
-      })
+    await api.crear({
+  prestatario:    form.prestatario.trim(),
+  monto:          Number(form.monto),
+  tasa_interes:   Number(form.tasa_interes),
+  meses:          Number(form.meses),
+  cuotas_por_mes: Number(form.cuotas_por_mes) || 1,  // ← esto
+  fecha_prestamo: form.fecha_prestamo,
+})
       setForm(INIT)
       onSuccess('Préstamo registrado correctamente.')
     } catch (err) {
@@ -85,8 +88,7 @@ export default function FormularioPage({ onSuccess }) {
       {total !== null && (
         <div style={{
           background: 'linear-gradient(135deg, #1B2B4B 0%, #2B4080 100%)',
-          borderRadius: 16, padding: '20px 24px', marginBottom: 24,
-          color: '#fff',
+          borderRadius: 16, padding: '20px 24px', marginBottom: 24, color: '#fff',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
             <div>
@@ -104,6 +106,7 @@ export default function FormularioPage({ onSuccess }) {
               </p>
             </div>
           </div>
+
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 12, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, opacity: 0.6 }}>
               Capital: <strong style={{ opacity: 1 }}>{formatCOP(monto)}</strong>
@@ -117,6 +120,32 @@ export default function FormularioPage({ onSuccess }) {
               </span>
             )}
           </div>
+
+          {/* Desglose de cuotas */}
+          {montoCuota && (
+            <div style={{
+              marginTop: 12, background: 'rgba(255,255,255,0.08)',
+              borderRadius: 10, padding: '12px 16px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+            }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Valor por cuota
+                </p>
+                <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#86EFAC', fontVariantNumeric: 'tabular-nums' }}>
+                  {formatCOP(montoCuota)}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ margin: 0, fontSize: 11, opacity: 0.6 }}>
+                  {cuotasPorMes} cuota{cuotasPorMes !== 1 ? 's' : ''} × {meses} mes{meses !== 1 ? 'es' : ''}
+                </p>
+                <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>
+                  = <strong>{totalCuotas} cuotas en total</strong>
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -141,8 +170,8 @@ export default function FormularioPage({ onSuccess }) {
             />
           </Field>
 
+          {/* Tasa + Meses */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            {/* Tasa */}
             <Field label="Tasa mensual" hint="Ej: 0.05 = 5%" error={errors.tasa_interes}>
               <input
                 style={FIELD_STYLE} name="tasa_interes" type="number"
@@ -150,7 +179,6 @@ export default function FormularioPage({ onSuccess }) {
                 value={form.tasa_interes} onChange={cambiar}
               />
             </Field>
-            {/* Meses */}
             <Field label="Número de meses" error={errors.meses}>
               <input
                 style={FIELD_STYLE} name="meses" type="number"
@@ -159,6 +187,38 @@ export default function FormularioPage({ onSuccess }) {
               />
             </Field>
           </div>
+
+          {/* Cuotas por mes */}
+          <Field label="Cuotas por mes" hint="¿Cuántas veces paga al mes?">
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[1, 2, 4].map(n => (
+                <button
+                  key={n} type="button"
+                  onClick={() => setForm(f => ({ ...f, cuotas_por_mes: String(n) }))}
+                  style={{
+                    flex: 1, padding: '10px 0', border: '1.5px solid',
+                    borderColor: cuotasPorMes === n ? '#3D7FFF' : '#E5E7EB',
+                    borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    background: cuotasPorMes === n ? '#EFF6FF' : '#FAFAFA',
+                    color: cuotasPorMes === n ? '#1D4ED8' : '#6B7280',
+                    transition: 'all .15s',
+                  }}
+                >
+                  {n === 1 ? 'Mensual' : n === 2 ? 'Quincenal' : 'Semanal'}
+                  <span style={{ display: 'block', fontSize: 10, fontWeight: 400, opacity: 0.7 }}>
+                    {n}x/mes
+                  </span>
+                </button>
+              ))}
+              <input
+                name="cuotas_por_mes" type="number" min="1" max="31"
+                value={form.cuotas_por_mes} onChange={cambiar}
+                placeholder="Otro"
+                style={{ ...FIELD_STYLE, width: 70, flex: 'none', textAlign: 'center', fontSize: 14 }}
+                title="Número personalizado de cuotas por mes"
+              />
+            </div>
+          </Field>
 
           {/* Fecha de inicio */}
           <Field label="Fecha de inicio del préstamo" error={errors.fecha_prestamo}>
@@ -179,9 +239,7 @@ export default function FormularioPage({ onSuccess }) {
               justifyContent: 'center', gap: 8,
             }}
           >
-            {loading ? <>
-              <Spinner /> Guardando…
-            </> : 'Registrar préstamo'}
+            {loading ? <><Spinner /> Guardando…</> : 'Registrar préstamo'}
           </button>
         </div>
       </form>
