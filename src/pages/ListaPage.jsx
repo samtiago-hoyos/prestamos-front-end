@@ -97,10 +97,10 @@ export default function ListaPage({ onToast }) {
         <EmptyState />
       ) : (
         <div style={{ overflowX: 'auto', borderRadius: 14, border: '1px solid #E5E7EB' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
             <thead>
               <tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                {['#', 'Prestatario', 'Monto', 'Total a devolver', 'Meses', 'Estado', 'Acciones'].map(h => (
+                {['#', 'Prestatario', 'Monto', 'Total a devolver', 'Saldo restante', 'Meses', 'Estado', 'Acciones'].map(h => (
                   <th key={h} style={{
                     padding: '11px 16px', textAlign: 'left',
                     fontSize: 11, fontWeight: 700, color: '#6B7280',
@@ -133,6 +133,11 @@ export default function ListaPage({ onToast }) {
                   </td>
                   <td style={{ padding: '14px 16px', fontWeight: 700, fontSize: 14, color: '#1B2B4B', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                     {formatCOP(p.total_devolver)}
+                  </td>
+                  <td style={{ padding: '14px 16px', fontWeight: 700, fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+                    color: p.saldo_restante <= 0 ? '#16A34A' : p.saldo_restante < p.total_devolver ? '#D97706' : '#EF4444'
+                  }}>
+                    {formatCOP(p.saldo_restante)}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: 14, color: '#374151' }}>
                     {p.meses}
