@@ -7,14 +7,14 @@ const handleResponse = async (res) => {
 }
 
 export const api = {
-  listar: () => fetch(BASE).then(handleResponse),
-  obtener: (id) => fetch(`${BASE}/${id}`).then(handleResponse),
-  crear: (body) => fetch(BASE, {
+  listar:         () => fetch(BASE).then(handleResponse),
+  obtener:        (id) => fetch(`${BASE}/${id}`).then(handleResponse),
+  crear:          (body) => fetch(BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(handleResponse),
-  actualizar: (id, body) => fetch(`${BASE}/${id}`, {
+  actualizar:     (id, body) => fetch(`${BASE}/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -24,12 +24,14 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado }),
   }).then(handleResponse),
-  eliminar: (id) => fetch(`${BASE}/${id}`, { method: 'DELETE' }).then(handleResponse),
-  registrarPago: (id, monto_cuota, nota) => fetch(`${BASE}/${id}/pagos`, {
+  eliminar:       (id) => fetch(`${BASE}/${id}`, { method: 'DELETE' }).then(handleResponse),
+  registrarPago:  (id, monto_cuota, nota) => fetch(`${BASE}/${id}/pagos`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ monto_cuota, nota }),
   }).then(handleResponse),
-  listarPagos: (id) => fetch(`${BASE}/${id}/pagos`).then(handleResponse),
-  
+  cancelarPago:   (id, pago_id) => fetch(`${BASE}/${id}/pagos/${pago_id}`, {
+    method: 'DELETE',
+  }).then(handleResponse),
+  listarPagos:    (id) => fetch(`${BASE}/${id}/pagos`).then(handleResponse),
 }

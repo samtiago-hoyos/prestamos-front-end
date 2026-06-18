@@ -27,9 +27,9 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
 
   const saldo = parseFloat(prestamo.saldo_restante ?? prestamo.monto)
   const monto = parseFloat(prestamo.monto)
-  const porcentajePagado = Math.min(((monto - saldo) / monto) * 100, 100).toFixed(1)
+  const totalDevolver = parseFloat(prestamo.total_devolver)
+  const porcentajePagado = Math.min(((totalDevolver - saldo) / totalDevolver) * 100, 100).toFixed(1)
 
-  // Cálculo de cuota sugerida
   const cuotasPorMes  = Math.max(1, parseInt(editCuotas) || 1)
   const mesesEdit     = parseInt(editMeses) || 0
   const totalCuotas   = mesesEdit * cuotasPorMes
@@ -77,6 +77,16 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
       if (res.data.estado === 'pagado') { onClose() }
     } catch (e) { onToast(e.message, 'error') }
     finally { setRegistrando(false) }
+  }
+
+  const handleCancelarPago = async (pago_id, total_cobrado) => {
+    if (!confirm(`¿Cancelar este pago de ${formatCOP(total_cobrado)}? El saldo se restaurará.`)) return
+    try {
+      await api.cancelarPago(prestamo.id, pago_id)
+      onToast('Pago cancelado. Saldo restaurado.')
+      await cargarPagos()
+      onActualizado()
+    } catch (e) { onToast(e.message, 'error') }
   }
 
   const validarEdicion = () => {
@@ -219,7 +229,6 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 <InfoRow label="Fecha vencimiento" value={prestamo.fecha_vencimiento ? formatFecha(prestamo.fecha_vencimiento) : '—'} color={estaVencido ? '#DC2626' : venceProximo ? '#D97706' : undefined} />
               </div>
 
-              {/* Cuota sugerida */}
               {prestamo.total_devolver && prestamo.meses && (
                 <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
@@ -269,7 +278,6 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 ✏️ Modifica los campos que necesites. El total a devolver se puede recalcular automáticamente.
               </div>
 
-              {/* Tasa */}
               <div>
                 <label style={labelStyle}>Tasa de interés mensual (%)</label>
                 <input
@@ -283,7 +291,6 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 {editErrors.tasa && <p style={errStyle}>{editErrors.tasa}</p>}
               </div>
 
-              {/* Meses + Cuotas por mes en grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Plazo (meses)</label>
@@ -326,7 +333,6 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 </div>
               </div>
 
-              {/* Preview cuota en edición */}
               {montoCuota && (
                 <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
@@ -337,7 +343,6 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 </div>
               )}
 
-              {/* Fecha */}
               <div>
                 <label style={labelStyle}>Fecha del préstamo</label>
                 <input
@@ -349,7 +354,6 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                 {editErrors.fecha && <p style={errStyle}>{editErrors.fecha}</p>}
               </div>
 
-              {/* Total */}
               <div>
                 <label style={labelStyle}>Total a devolver (COP)</label>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -360,7 +364,7 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                     style={{ ...inputStyle, flex: 1, borderColor: editErrors.total ? '#EF4444' : '#E5E7EB' }}
                     placeholder="ej: 1100000"
                   />
-                  <button onClick={recalcularTotal} title="Recalcular en base a tasa y meses" style={{
+                  <button onClick={recalcularTotal} title="Recalcular" style={{
                     padding: '0 14px', border: '1.5px solid #BFDBFE', borderRadius: 8,
                     background: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
                   }}>↺ Calc</button>
@@ -445,9 +449,21 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                             </p>
                           )}
                         </div>
-                        <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#15803D', whiteSpace: 'nowrap' }}>
-                          {formatCOP(p.total_cobrado)}
-                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#15803D', whiteSpace: 'nowrap' }}>
+                            {formatCOP(p.total_cobrado)}
+                          </p>
+                          <button
+                            onClick={() => handleCancelarPago(p.id, p.total_cobrado)}
+                            title="Cancelar pago"
+                            style={{
+                              width: 28, height: 28, borderRadius: 6, border: 'none',
+                              background: '#FEE2E2', color: '#EF4444', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 16, fontWeight: 700, flexShrink: 0,
+                            }}
+                          >×</button>
+                        </div>
                       </div>
                     </div>
                   ))}
