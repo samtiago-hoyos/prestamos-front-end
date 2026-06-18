@@ -1,4 +1,3 @@
-// components/DetallePrestamo.jsx
 import { useState, useEffect } from 'react'
 import { formatCOP, formatFecha, ESTADO_CONFIG } from '../utils/format'
 import { api } from '../services/api'
@@ -6,17 +5,17 @@ import { api } from '../services/api'
 const ESTADOS = ['pendiente', 'pagado', 'vencido']
 
 export default function DetallePrestamo({ prestamo, onClose, onActualizado, onToast }) {
-  const [estado, setEstado]       = useState(prestamo.estado)
-  const [saving, setSaving]       = useState(false)
-  const [pagos, setPagos]         = useState([])
+  const [estado, setEstado]           = useState(prestamo.estado)
+  const [saving, setSaving]           = useState(false)
+  const [pagos, setPagos]             = useState([])
   const [loadingPagos, setLoadingPagos] = useState(true)
-  const [cuota, setCuota]         = useState('')
+  const [cuota, setCuota]             = useState('')
+  const [nota, setNota]               = useState('')
   const [registrando, setRegistrando] = useState(false)
-  const [tab, setTab]             = useState('detalle') // 'detalle' | 'pagos'
+  const [tab, setTab]                 = useState('detalle')
 
   const saldo = parseFloat(prestamo.saldo_restante ?? prestamo.monto)
   const monto = parseFloat(prestamo.monto)
-  const interesTotal = parseFloat(prestamo.total_devolver) - monto
   const porcentajePagado = Math.min(((monto - saldo) / monto) * 100, 100).toFixed(1)
 
   // Vencimiento
@@ -27,13 +26,15 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
   const diasRestantes = fechaVenc ? Math.floor((fechaVenc - hoy) / (1000*60*60*24)) : null
   const venceProximo = diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 7 && prestamo.estado === 'pendiente'
 
-  // Cargar historial de pagos
-  useEffect(() => {
-    api.listarPagos(prestamo.id)
-      .then(res => setPagos(res.data ?? []))
-      .catch(() => setPagos([]))
-      .finally(() => setLoadingPagos(false))
-  }, [prestamo.id])
+  const cargarPagos = async () => {
+    try {
+      const res = await api.listarPagos(prestamo.id)
+      setPagos(res.data ?? [])
+    } catch { setPagos([]) }
+    finally { setLoadingPagos(false) }
+  }
+
+  useEffect(() => { cargarPagos() }, [prestamo.id])
 
   const guardarEstado = async () => {
     if (estado === prestamo.estado) return
@@ -47,22 +48,15 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
   }
 
   const hacerPago = async () => {
-    if (!cuota || Number(cuota) <= 0) {
-      onToast('Ingresa un monto válido.', 'error'); return
-    }
-    if (Number(cuota) > saldo) {
-      onToast('La cuota supera el saldo restante.', 'error'); return
-    }
+    if (!cuota || Number(cuota) <= 0) { onToast('Ingresa un monto válido.', 'error'); return }
     setRegistrando(true)
     try {
-      const res = await api.registrarPago(prestamo.id, Number(cuota))
-      onToast(`Pago registrado. Saldo restante: ${formatCOP(res.data.saldo_restante)}`)
-      setCuota('')
-      // Recargar pagos
-      const pagosRes = await api.listarPagos(prestamo.id)
-      setPagos(pagosRes.data ?? [])
+      const res = await api.registrarPago(prestamo.id, Number(cuota), nota)
+      onToast(`Pago de ${formatCOP(Number(cuota))} registrado. Saldo: ${formatCOP(res.data.saldo_restante)}`)
+      setCuota(''); setNota('')
+      await cargarPagos()
       onActualizado()
-      if (res.data.estado === 'pagado') onClose()
+      if (res.data.estado === 'pagado') { onClose() }
     } catch (e) { onToast(e.message, 'error') }
     finally { setRegistrando(false) }
   }
@@ -78,27 +72,27 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
       <div onClick={e => e.stopPropagation()} style={{
         background: '#fff', borderRadius: 20, width: '100%', maxWidth: 520,
         boxShadow: '0 24px 80px rgba(0,0,0,0.22)', overflow: 'hidden',
-        animation: 'fadeIn .2s ease', maxHeight: '90vh', overflowY: 'auto',
+        animation: 'fadeIn .2s ease', maxHeight: '92vh', overflowY: 'auto',
       }}>
 
         {/* Advertencia vencido */}
         {estaVencido && (
-          <div style={{ background: '#FEE2E2', borderBottom: '1px solid #FECACA', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: '#FEE2E2', borderBottom: '1px solid #FECACA', padding: '12px 20px', display: 'flex', gap: 10 }}>
             <span style={{ fontSize: 20 }}>⚠️</span>
             <div>
               <p style={{ margin: 0, fontWeight: 700, color: '#DC2626', fontSize: 14 }}>
-                Préstamo vencido hace {diasVencido} día{diasVencido !== 1 ? 's' : ''}
+                Vencido hace {diasVencido} día{diasVencido !== 1 ? 's' : ''}
               </p>
               <p style={{ margin: 0, color: '#EF4444', fontSize: 12 }}>
-                Venció el {formatFecha(prestamo.fecha_vencimiento)} y aún está pendiente.
+                Venció el {formatFecha(prestamo.fecha_vencimiento)} y sigue pendiente.
               </p>
             </div>
           </div>
         )}
 
-        {/* Advertencia próximo a vencer */}
+        {/* Advertencia próximo */}
         {venceProximo && (
-          <div style={{ background: '#FEF3C7', borderBottom: '1px solid #FDE68A', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: '#FEF3C7', borderBottom: '1px solid #FDE68A', padding: '12px 20px', display: 'flex', gap: 10 }}>
             <span style={{ fontSize: 20 }}>🕐</span>
             <div>
               <p style={{ margin: 0, fontWeight: 700, color: '#B45309', fontSize: 14 }}>
@@ -127,22 +121,19 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
             <StatCard label="Monto" value={formatCOP(monto)} />
-            <StatCard label="Total a devolver" value={formatCOP(prestamo.total_devolver)} accent="#93C5FD" />
-            <StatCard label="Saldo restante" value={formatCOP(saldo)} accent={saldo === 0 ? '#86EFAC' : '#FCD34D'} />
+            <StatCard label="Total acordado" value={formatCOP(prestamo.total_devolver)} accent="#93C5FD" />
+            <StatCard label="Saldo restante" value={formatCOP(saldo)} accent={saldo <= 0 ? '#86EFAC' : '#FCD34D'} />
           </div>
-
-          {/* Barra de progreso de pago */}
-          <div style={{ marginTop: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          {/* Barra progreso */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Progreso de pago</span>
               <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{porcentajePagado}%</span>
             </div>
             <div style={{ height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 99, overflow: 'hidden' }}>
               <div style={{
-                height: '100%', borderRadius: 99,
-                width: `${porcentajePagado}%`,
-                background: 'linear-gradient(90deg, #22C55E, #86EFAC)',
-                transition: 'width .6s ease',
+                height: '100%', borderRadius: 99, width: `${porcentajePagado}%`,
+                background: 'linear-gradient(90deg, #22C55E, #86EFAC)', transition: 'width .6s ease',
               }}/>
             </div>
           </div>
@@ -150,41 +141,29 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid #E5E7EB' }}>
-          {[['detalle', '📋 Detalle'], ['pagos', '💰 Cuotas']].map(([key, label]) => (
+          {[['detalle','📋 Detalle'], ['pagos','💰 Cuotas']].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)} style={{
               flex: 1, padding: '12px 0', border: 'none', cursor: 'pointer',
               background: 'none', fontWeight: tab === key ? 700 : 400,
               color: tab === key ? '#1B2B4B' : '#9CA3AF', fontSize: 14,
               borderBottom: tab === key ? '2px solid #3D7FFF' : '2px solid transparent',
-              transition: 'all .15s',
             }}>{label}</button>
           ))}
         </div>
 
         <div style={{ padding: '20px 24px' }}>
 
-          {/* ── Tab Detalle ── */}
+          {/* ── Detalle ── */}
           {tab === 'detalle' && (
             <>
-              {/* Info interés */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: '#6B7280' }}>Costo del crédito</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1B2B4B' }}>{formatCOP(interesTotal)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 12, color: '#9CA3AF' }}>Tasa {(parseFloat(prestamo.tasa_interes)*100).toFixed(2)}% mensual</span>
-                  <span style={{ fontSize: 12, color: '#9CA3AF' }}>{prestamo.meses} meses</span>
-                </div>
-              </div>
-
-              {/* Fechas */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+                <InfoRow label="Tasa de interés" value={`${(parseFloat(prestamo.tasa_interes)*100).toFixed(2)}% mensual`} />
+                <InfoRow label="Plazo" value={`${prestamo.meses} meses`} />
                 <InfoRow label="Fecha préstamo" value={prestamo.fecha_prestamo ? formatFecha(prestamo.fecha_prestamo) : '—'} />
                 <InfoRow label="Fecha vencimiento" value={prestamo.fecha_vencimiento ? formatFecha(prestamo.fecha_vencimiento) : '—'} color={estaVencido ? '#DC2626' : venceProximo ? '#D97706' : undefined} />
               </div>
 
-              {/* Cambio de estado */}
+              {/* Estado */}
               <div style={{ background: '#F9FAFB', borderRadius: 12, padding: '16px' }}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Estado del préstamo</p>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -195,7 +174,7 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
                         flex: 1, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
                         border: sel ? `2px solid ${c.dot}` : '2px solid transparent',
                         background: sel ? c.bg : '#fff', color: sel ? c.dot : '#6B7280',
-                        fontWeight: sel ? 700 : 500, fontSize: 12, transition: 'all .15s',
+                        fontWeight: sel ? 700 : 500, fontSize: 12,
                       }}>{c.label}</button>
                     )
                   })}
@@ -213,54 +192,39 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
             </>
           )}
 
-          {/* ── Tab Cuotas ── */}
+          {/* ── Cuotas ── */}
           {tab === 'pagos' && (
             <>
-              {/* Registrar cuota */}
               {prestamo.estado !== 'pagado' && (
                 <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 12, padding: '16px', marginBottom: 20 }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: '#15803D', marginBottom: 4 }}>💰 Registrar cuota</p>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#15803D', marginBottom: 4 }}>💰 Registrar pago</p>
                   <p style={{ fontSize: 12, color: '#16A34A', marginBottom: 12 }}>
-                    Saldo restante: <strong>{formatCOP(saldo)}</strong> — Se cobrará el {(parseFloat(prestamo.tasa_interes)*100).toFixed(2)}% de interés sobre la cuota.
+                    Saldo restante: <strong>{formatCOP(saldo)}</strong>
                   </p>
-                  {/* Preview interés */}
-                  {Number(cuota) > 0 && (
-                    <div style={{ background: '#fff', borderRadius: 8, padding: '10px 12px', marginBottom: 12, border: '1px solid #BBF7D0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontSize: 12, color: '#6B7280' }}>Capital cuota:</span>
-                        <span style={{ fontSize: 12, fontWeight: 600 }}>{formatCOP(Number(cuota))}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontSize: 12, color: '#6B7280' }}>Interés ({(parseFloat(prestamo.tasa_interes)*100).toFixed(2)}%):</span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: '#D97706' }}>
-                          + {formatCOP(Number(cuota) * parseFloat(prestamo.tasa_interes))}
-                        </span>
-                      </div>
-                      <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Total a cobrar:</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#15803D' }}>
-                          {formatCOP(Number(cuota) + Number(cuota) * parseFloat(prestamo.tasa_interes))}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: 10 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input
-                      type="number" placeholder="Monto de la cuota"
+                      type="number" placeholder="Monto que pagó el cliente"
                       value={cuota} onChange={e => setCuota(e.target.value)}
-                      min="1" max={saldo}
+                      min="1"
                       style={{
-                        flex: 1, padding: '10px 14px', border: '1.5px solid #BBF7D0',
+                        padding: '10px 14px', border: '1.5px solid #BBF7D0',
                         borderRadius: 8, fontSize: 14, outline: 'none',
                       }}
                     />
+                    <input
+                      type="text" placeholder="Nota o acuerdo (opcional) — ej: acordó pagar el resto el lunes"
+                      value={nota} onChange={e => setNota(e.target.value)}
+                      style={{
+                        padding: '10px 14px', border: '1.5px solid #E5E7EB',
+                        borderRadius: 8, fontSize: 13, outline: 'none', color: '#374151',
+                      }}
+                    />
                     <button onClick={hacerPago} disabled={registrando} style={{
-                      padding: '10px 18px', background: registrando ? '#86EFAC' : '#22C55E',
+                      padding: '11px 0', background: registrando ? '#86EFAC' : '#22C55E',
                       color: '#fff', border: 'none', borderRadius: 8,
                       fontWeight: 700, fontSize: 14, cursor: registrando ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
                     }}>
-                      {registrando ? '...' : 'Registrar'}
+                      {registrando ? 'Registrando…' : '✓ Registrar pago'}
                     </button>
                   </div>
                 </div>
@@ -268,40 +232,40 @@ export default function DetallePrestamo({ prestamo, onClose, onActualizado, onTo
 
               {/* Historial */}
               <p style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>
-                📋 Historial de pagos {pagos.length > 0 && `(${pagos.length})`}
+                📋 Historial {pagos.length > 0 && `(${pagos.length} pagos)`}
               </p>
               {loadingPagos ? (
-                <p style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center', padding: '20px 0' }}>Cargando...</p>
+                <p style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center', padding: '20px 0' }}>Cargando…</p>
               ) : pagos.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: '#9CA3AF', border: '1.5px dashed #E5E7EB', borderRadius: 10 }}>
-                  <p style={{ fontSize: 14 }}>No hay pagos registrados aún.</p>
+                <div style={{ textAlign: 'center', padding: '24px', color: '#9CA3AF', border: '1.5px dashed #E5E7EB', borderRadius: 10 }}>
+                  <p style={{ fontSize: 14, margin: 0 }}>No hay pagos registrados aún.</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {pagos.map((p, i) => (
                     <div key={p.id} style={{
                       background: '#F9FAFB', borderRadius: 10, padding: '12px 14px',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     }}>
-                      <div>
-                        <p style={{ margin: 0, fontSize: 12, color: '#9CA3AF' }}>
-                          Cuota #{i+1} — {formatFecha(p.fecha_pago)}
-                        </p>
-                        <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6B7280' }}>
-                          Capital: {formatCOP(p.monto_cuota)} + Interés: {formatCOP(p.interes_cuota)}
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#15803D' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: 12, color: '#9CA3AF' }}>
+                            Cuota #{i+1} — {formatFecha(p.fecha_pago)}
+                          </p>
+                          {p.nota && (
+                            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#6B7280', fontStyle: 'italic' }}>
+                              📝 {p.nota}
+                            </p>
+                          )}
+                        </div>
+                        <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#15803D', whiteSpace: 'nowrap' }}>
                           {formatCOP(p.total_cobrado)}
                         </p>
-                        <p style={{ margin: 0, fontSize: 11, color: '#9CA3AF' }}>cobrado</p>
                       </div>
                     </div>
                   ))}
-                  {/* Total cobrado */}
+                  {/* Total */}
                   <div style={{ borderTop: '2px solid #E5E7EB', paddingTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>Total cobrado:</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>Total pagado:</span>
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#15803D' }}>
                       {formatCOP(pagos.reduce((s, p) => s + parseFloat(p.total_cobrado), 0))}
                     </span>
