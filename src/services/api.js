@@ -14,16 +14,21 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(handleResponse),
+  actualizar: (id, body) => fetch(`${BASE}/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(handleResponse),
   actualizarEstado: (id, estado) => fetch(`${BASE}/${id}/estado`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado }),
   }).then(handleResponse),
   eliminar: (id) => fetch(`${BASE}/${id}`, { method: 'DELETE' }).then(handleResponse),
-  registrarPago: (id, monto_cuota) => fetch(`${BASE}/${id}/pagos`, {
+  registrarPago: (id, monto_cuota, nota) => fetch(`${BASE}/${id}/pagos`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ monto_cuota }),
+    body: JSON.stringify({ monto_cuota, nota }),
   }).then(handleResponse),
   listarPagos: (id) => fetch(`${BASE}/${id}/pagos`).then(handleResponse),
 }
